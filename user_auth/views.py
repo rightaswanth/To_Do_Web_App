@@ -3,24 +3,35 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse,JsonResponse
-from user_auth.serializers import UserRegisterSerializer, ForgotPasswordSerializer
+from user_auth.serializers import UserRegisterSerializer, ForgotPasswordSerializer, UserLoginSerializer
 from rest_framework.exceptions import ValidationError 
 from .models import User
+from rest_framework.authtoken.models import Token
+from rest_framework.permissions import IsAuthenticated
 # Create your views here.
 
 class UserLogin(APIView):
     def post(self,request,*args,**kwargs):
-        
-        if User.objects.filter(username=request.data['username']).exists():
-            user = User.objects.get(username=request.data['username'])
-            if user.hash_password == request.data['password']:
-                response = {
-                    'Success':True,
-                    'username':user.username,
-                    'status':202
-                }
-                return JsonResponse(response,status=status.HTTP_202_ACCEPTED)
-            return JsonResponse({'message':'Incorrect Password'},status=status.HTTP_400_BAD_REQUEST)
+        data = dict(request.data)
+        if 'password' in data:
+            data['hash_password'] = data.pop('password')
+        for key, value in data.items():
+            if isinstance(value, list) and len(value) == 1:
+                data[key] = value[0]
+        serializer = UserLoginSerializer(data=request.data)
+        if serializer.is_valid():
+            if User.objects.filter(username=request.data['username']).exists():
+                user = User.objects.get(username=request.data['username'])
+                token , created = Token.objects.get_or_create(username=serializer.data['username'])
+                if user.hash_password == request.data['password']:
+                    response = {
+                        'Success':True,
+                        'username':user.username,
+                        'token':token.key,
+                        'status':202
+                    }
+                    return JsonResponse(response,status=status.HTTP_202_ACCEPTED)
+                return JsonResponse({'message':'Incorrect Password'},status=status.HTTP_400_BAD_REQUEST)
         return JsonResponse({'message':'Invalid User'},status=status.HTTP_404_NOT_FOUND)
     
 class UserRegister(APIView):
@@ -88,8 +99,10 @@ class ResetPassword(APIView):
         return Response({'message':'Invalid Input'},status=status.HTTP_400_BAD_REQUEST)
 
 
-        
-        
-
 class UserLogout(APIView):
-    pass
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args):
+        token = Token.objects.get(user=request.user)
+        token.delete()
+        return Response({'message':'Log Out.....'}, status=status.HTTP_200_OK)

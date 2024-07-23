@@ -3,11 +3,11 @@ from user_auth.models import User
 
 from rest_framework import status
 
-# class UserLoginSerializer(serializers.Serializer):
+class UserLoginSerializer(serializers.Serializer):
 
-#     class Meta:
-#         model = User
-#         fields = ['id','hash_password','username']
+    class Meta:
+        model = User
+        fields = ['id','hash_password','username']
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):
