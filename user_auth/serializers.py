@@ -1,31 +1,31 @@
 from rest_framework import serializers
-from user_auth.models import User
+from user_auth.models import UserAuth
 
 from rest_framework import status
 
 class UserLoginSerializer(serializers.Serializer):
 
     class Meta:
-        model = User
-        fields = ['id','hash_password','username']
+        model = UserAuth
+        fields = ['id','password','email']
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     
     class Meta:
-        model = User
-        fields = ['id','first_name','last_name','email','hash_password','username']
+        model = UserAuth
+        fields = ['id','first_name','last_name','email','password']
         extra_kwargs = {
-            'hash_password':{'write_only':True}
+            'password':{'write_only':True}
         }
 
 class ForgotPasswordSerializer(serializers.ModelSerializer):
     
     class Meta:
-        model = User
-        fields = ['id','hash_password']
+        model = UserAuth
+        fields = ['id','password']
         extra_kwargs = {
-            'hash_password':{'write_only':True}
+            'password':{'write_only':True}
         }
     
 

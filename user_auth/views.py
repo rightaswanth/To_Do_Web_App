@@ -5,76 +5,90 @@ from rest_framework import status
 from django.http import HttpResponse,JsonResponse
 from user_auth.serializers import UserRegisterSerializer, ForgotPasswordSerializer, UserLoginSerializer
 from rest_framework.exceptions import ValidationError 
-from .models import User
+from .models import UserAuth
 from rest_framework.authtoken.models import Token
-from rest_framework.permissions import IsAuthenticated
-# Create your views here.
+from rest_framework.permissions import IsAuthenticated,AllowAny
+
 
 class UserLogin(APIView):
-    def post(self,request,*args,**kwargs):
-        data = dict(request.data)
-        if 'password' in data:
-            data['hash_password'] = data.pop('password')
+
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        data = request.data.copy()
+
         for key, value in data.items():
             if isinstance(value, list) and len(value) == 1:
                 data[key] = value[0]
-        serializer = UserLoginSerializer(data=request.data)
+        serializer = UserLoginSerializer(data=data)
         if serializer.is_valid():
-            if User.objects.filter(username=request.data['username']).exists():
-                user = User.objects.get(username=request.data['username'])
-                token , created = Token.objects.get_or_create(username=serializer.data['username'])
-                if user.hash_password == request.data['password']:
-                    response = {
-                        'Success':True,
-                        'username':user.username,
-                        'token':token.key,
-                        'status':202
-                    }
-                    return JsonResponse(response,status=status.HTTP_202_ACCEPTED)
-                return JsonResponse({'message':'Incorrect Password'},status=status.HTTP_400_BAD_REQUEST)
-        return JsonResponse({'message':'Invalid User'},status=status.HTTP_404_NOT_FOUND)
+            email = data.get('email')
+            password = data.get('password')
+
+            try:
+                user = UserAuth.objects.get(email=email)
+            except UserAuth.DoesNotExist:
+                return Response({'message': 'Invalid User'}, status=status.HTTP_404_NOT_FOUND)
+
+            if user.password == password:
+                token, created = Token.objects.get_or_create(user=user)
+                response = {
+                    'Success': True,
+                    'username': user.email,
+                    'token': token.key,
+                    'status': 202
+                }
+                return Response(response, status=status.HTTP_202_ACCEPTED)
+            else:
+                return Response({'message': 'Incorrect Password'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response({'message': 'Invalid Data'}, status=status.HTTP_400_BAD_REQUEST)
     
 class UserRegister(APIView):
+    permission_classes = [AllowAny]
+    
     def post(self,request,*args,**kwargs):
-
+        
         password = request.data['password']
         confirm_password = request.data['confirm_password']
         if password != confirm_password:
             raise ValidationError({'message':'Both Password not same. Must be same'})
         data = dict(request.data)
         data.pop('confirm_password',None)
-        if 'password' in data:
-            data['hash_password'] = data.pop('password')
+
         for key, value in data.items():
             if isinstance(value, list) and len(value) == 1:
                 data[key] = value[0]
-        user_name = data['first_name'] + data['last_name']
-        data['username'] = user_name.strip()
-        # print(data['hash_password'])
+        
         serializer = UserRegisterSerializer(data = data)
 
         if serializer.is_valid():
             serializer.save()
             response = {
                 'status':200,
-                'username': data['username'],
+                'username': data['email'],
                 'message':'new user created'
             }
             return JsonResponse(response,status=status.HTTP_200_OK)
         return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class PasswordForgot(APIView):
+
+    permission_classes =  [IsAuthenticated]
+
     def post(self,request,*args,**kwargs):
         email = request.data['email']
-        if User.objects.filter(email=email).exists():
+        if UserAuth.objects.filter(email=email).exists():
             response = {
                 'Succes':True,
-                'message': "Reset Password mail is sended to the email"
+                'message': "Reset Password mail is sended to the email id"
             }
             return Response(response,status=status.HTTP_200_OK)
         return Response({'message':'The user is not existing'},status=status.HTTP_404_NOT_FOUND)
 
 class ResetPassword(APIView):
+
+    permission_classes = [IsAuthenticated]
 
     def patch(self,request,*args,**kwargs):
 
@@ -86,23 +100,18 @@ class ResetPassword(APIView):
             return Response(response,status=status.HTTP_400_BAD_REQUEST)
         data = dict(request.data)
         data.pop('confirm_password',None)
-        if 'password' in data:
-            data['hashed_password'] = data.pop('password')
-        data['hashed_password'] = data['hashed_password'][0]
-        serializer = ForgotPasswordSerializer(data=data)
-
-        if serializer.is_valid():
-            response = {
-                'message':'Password reseted'
-            }
-            return Response(response,status=status.HTTP_200_OK)
+        data['password'] = data['password'][0]
+        password = data['password']
+        if UserAuth.objects.filter(email=request.user).exists():
+            UserAuth.objects.filter(email=request.user).update(password=password)
+            return Response({'message':'password reseted'})
         return Response({'message':'Invalid Input'},status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserLogout(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, *args):
+    def delete(self, request, *args):
         token = Token.objects.get(user=request.user)
         token.delete()
         return Response({'message':'Log Out.....'}, status=status.HTTP_200_OK)
