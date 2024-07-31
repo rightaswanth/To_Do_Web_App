@@ -1,3 +1,11 @@
+### Python ###
+__pycache__/
+
+# Distribution / packaging
+
+venv/
+
+### Django ###
 .env
-venv
 db.sqlite3
+

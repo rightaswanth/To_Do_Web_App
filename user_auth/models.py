@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser,PermissionsMixin,BaseUserManager
+import datetime
+from django.core.validators import validate_email
 
 # Create your models here.
 
@@ -20,9 +22,10 @@ class CustomUserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
         
 class UserAuth(AbstractBaseUser, PermissionsMixin):
+    id = models.IntegerField(primary_key=True)
     first_name = models.CharField(max_length=100, blank=False, null=False)
     last_name = models.CharField(max_length=100, blank=True)
-    email = models.EmailField(unique=True)
+    email = models.EmailField(unique=True,validators=[validate_email])
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
@@ -30,9 +33,10 @@ class UserAuth(AbstractBaseUser, PermissionsMixin):
     is_superuser = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = []
+    REQUIRED_FIELDS = ['first_name']
 
     objects = CustomUserManager()
 
     def __str__(self):
-        return self.email
+        return f"id : {self.id} email : {self.email}"
+    
